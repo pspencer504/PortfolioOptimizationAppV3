@@ -1,14 +1,25 @@
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.optimize import minimize
+import sys
+import os
 
+# Ensure required packages are installed
+try:
+    import yfinance as yf
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy.optimize import minimize
+    import streamlit as st
+except ImportError:
+    os.system(f"{sys.executable} -m pip install yfinance pandas numpy matplotlib scipy streamlit")
+    import yfinance as yf
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy.optimize import minimize
+    import streamlit as st
 
 # Ensure compatibility with Streamlit
 plt.switch_backend('Agg')
-
 
 # Centered App Title
 st.markdown("<h1 style='text-align: center;'>📈 Smart Portfolio Optimization</h1>", unsafe_allow_html=True)

@@ -99,112 +99,107 @@ def plot_efficient_frontier(returns, risk_free_rate):
 
 
 # Main Functionality
+# Main Functionality
 if optimize_button:
-    ticker_list = [ticker.strip() for ticker in tickers.split(',')]
-    data = fetch_data(ticker_list, '2020-01-01', '2024-01-01')
-    returns = data.pct_change().dropna()
+    ticker_list = [ticker.strip() for ticker in tickers.split(',') if ticker.strip()]
 
+    if not ticker_list:
+        st.warning("⚠️ Please enter at least one valid stock ticker.")
+    else:
+        data = fetch_data(ticker_list, '2020-01-01', '2024-01-01')
+        if data.empty or data.isnull().all().all():
+            st.warning("⚠️ No valid data found for the given tickers. Please check your ticker symbols.")
+        else:
+            returns = data.pct_change().dropna()
 
-    # Fetch Risk-Free Rate (10-year US Treasury yield)
-    treasury_yield = yf.Ticker("^TNX")
-    treasury_data = treasury_yield.history(start="2020-01-01", end="2024-01-01")
-    risk_free_rate = treasury_data['Close'].iloc[-1] / 100
+            # Fetch Risk-Free Rate (10-year US Treasury yield)
+            treasury_yield = yf.Ticker("^TNX")
+            treasury_data = treasury_yield.history(start="2020-01-01", end="2024-01-01")
 
+            if treasury_data.empty:
+                st.warning("⚠️ Unable to retrieve risk-free rate data. Try again later.")
+            else:
+                risk_free_rate = treasury_data['Close'].iloc[-1] / 100
 
-    # Optimize Portfolio
-    optimized_result = optimize_portfolio(returns, risk_free_rate)
-    optimized_weights = optimized_result.x
-    optimized_return, optimized_volatility = portfolio_performance(optimized_weights, returns)
-    optimized_sharpe_ratio = (optimized_return - risk_free_rate) / optimized_volatility
+                # Optimize Portfolio
+                optimized_result = optimize_portfolio(returns, risk_free_rate)
+                optimized_weights = optimized_result.x
+                optimized_return, optimized_volatility = portfolio_performance(optimized_weights, returns)
+                optimized_sharpe_ratio = (optimized_return - risk_free_rate) / optimized_volatility
 
+                # Sort Allocations in Descending Order
+                sorted_indices = np.argsort(optimized_weights)[::-1]
+                sorted_tickers = [ticker_list[i] for i in sorted_indices]
+                sorted_weights = optimized_weights[sorted_indices]
 
-    # Sort Allocations in Descending Order
-    sorted_indices = np.argsort(optimized_weights)[::-1]
-    sorted_tickers = [ticker_list[i] for i in sorted_indices]
-    sorted_weights = optimized_weights[sorted_indices]
+                # Pie Chart - Portfolio Allocation
+                st.header("📊 Optimized Portfolio Allocation")
+                fig, ax = plt.subplots()
+                cmap = plt.get_cmap('Greens')
+                colors = cmap(np.linspace(0.3, 0.7, len(sorted_tickers)))
 
+                labels = [f"{ticker} {w*100:.1f}%" if w >= 0.1 else "" for ticker, w in zip(sorted_tickers, sorted_weights)]
+                ax.pie(sorted_weights, labels=labels, startangle=140, colors=colors)
+                legend_labels = [f"{ticker}: {w*100:.1f}%" for ticker, w in zip(sorted_tickers, sorted_weights)]
+                ax.legend(legend_labels, title="Stock Allocations", loc="center left", bbox_to_anchor=(1, 0.5))
+                ax.axis('equal')
+                st.pyplot(fig)
 
-    # Pie Chart - Portfolio Allocation
-    st.header("📊 Optimized Portfolio Allocation")
-    fig, ax = plt.subplots()
-    cmap = plt.get_cmap('Greens')
-    colors = cmap(np.linspace(0.3, 0.7, len(sorted_tickers)))
+                # Allocation Breakdown
+                st.markdown("<b>Portfolio Breakdown</b>", unsafe_allow_html=True)
+                st.write("These are the optimized allocations for your investment:")
 
+                allocation = pd.DataFrame({
+                    'Ticker': sorted_tickers,
+                    'Allocation (%)': np.round(sorted_weights * 100, 2),
+                    'Amount ($)': np.round(sorted_weights * principal, 2)
+                })
+                st.dataframe(allocation)
 
-    # Labels for only large percentages (≥ 10%)
-    labels = [f"{ticker} {w*100:.1f}%" if w >= 0.1 else "" for ticker, w in zip(sorted_tickers, sorted_weights)]
-    ax.pie(sorted_weights, labels=labels, startangle=140, colors=colors)
+                # Save the input + results to session state for review log
+                st.session_state.review_log.insert(0, {
+                    "Tickers": tickers,
+                    "Principal": principal,
+                    "Allocation": allocation
+                })
 
+                # Efficient Frontier & Risk-Return Graph
+                st.header("📈 Risk-Return Analysis")
+                results, weights_record = plot_efficient_frontier(returns, risk_free_rate)
+                max_sharpe_idx = np.argmax(results[2])
+                sdp, rp = results[0, max_sharpe_idx], results[1, max_sharpe_idx]
 
-    # Legend with Ordered Values
-    legend_labels = [f"{ticker}: {w*100:.1f}%" for ticker, w in zip(sorted_tickers, sorted_weights)]
-    ax.legend(legend_labels, title="Stock Allocations", loc="center left", bbox_to_anchor=(1, 0.5))
-    ax.axis('equal')
-    st.pyplot(fig)
+                fig, ax = plt.subplots(figsize=(10, 6))
+                scatter = ax.scatter(results[0, :], results[1, :], c=results[2, :], cmap='Blues', marker='o')
+                ax.scatter(sdp, rp, marker='*', color='r', s=200, label='Max Sharpe Ratio Portfolio')
+                ax.set_xlabel('Risk (Volatility)')
+                ax.set_ylabel('Expected Return')
+                ax.legend()
+                plt.colorbar(scatter, label='Sharpe Ratio')
+                st.pyplot(fig)
 
+                # Explanation of Markowitz Theory & Sharpe Ratio
+                st.header("📊 Understanding Your Portfolio")
+                st.write(
+                    "This portfolio is optimized using **Markowitz Modern Portfolio Theory (MPT)**, "
+                    "which finds the best combination of stocks to maximize return while minimizing risk. "
+                    "The **Efficient Frontier graph** above shows different portfolios' risk-return tradeoff."
+                )
 
-    # Allocation Breakdown
-    st.markdown("<b>Portfolio Breakdown</b>", unsafe_allow_html=True)
-    st.write("These are the optimized allocations for your investment:")
+                st.write(
+                    "The **Sharpe Ratio** measures how much excess return you earn per unit of risk. "
+                    "A **higher Sharpe Ratio** means a better risk-adjusted return:"
+                )
+                st.markdown(
+                    "- 🔴 **< 1.0:** Weak risk-adjusted returns\n"
+                    "- 🟡 **1.0 - 2.0:** Moderate returns\n"
+                    "- 🟢 **> 2.0:** Strong risk-adjusted returns"
+                )
 
+                st.markdown(
+                    "Your portfolio's **Sharpe Ratio** is **{:.2f}**, which indicates its expected performance.".format(optimized_sharpe_ratio)
+                )
 
-    allocation = pd.DataFrame({
-        'Ticker': sorted_tickers,
-        'Allocation (%)': np.round(sorted_weights * 100, 2),
-        'Amount ($)': np.round(sorted_weights * principal, 2)
-    })
-    st.dataframe(allocation)
-
-
-    # Save the input + results to session state for review log
-    st.session_state.review_log.insert(0, {
-        "Tickers": tickers,
-        "Principal": principal,
-        "Allocation": allocation
-    })
-
-
-    # Efficient Frontier & Risk-Return Graph
-    st.header("📈 Risk-Return Analysis")
-    results, weights_record = plot_efficient_frontier(returns, risk_free_rate)
-    max_sharpe_idx = np.argmax(results[2])
-    sdp, rp = results[0, max_sharpe_idx], results[1, max_sharpe_idx]
-
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    scatter = ax.scatter(results[0, :], results[1, :], c=results[2, :], cmap='Blues', marker='o')
-    ax.scatter(sdp, rp, marker='*', color='r', s=200, label='Max Sharpe Ratio Portfolio')
-    ax.set_xlabel('Risk (Volatility)')
-    ax.set_ylabel('Expected Return')
-    ax.legend()
-    plt.colorbar(scatter, label='Sharpe Ratio')
-    st.pyplot(fig)
-
-
-# Explanation of Markowitz Theory & Sharpe Ratio
-    st.header("📊 Understanding Your Portfolio")
-    st.write(
-        "This portfolio is optimized using **Markowitz Modern Portfolio Theory (MPT)**, "
-        "which finds the best combination of stocks to maximize return while minimizing risk. "
-        "The **Efficient Frontier graph** above shows different portfolios' risk-return tradeoff."
-    )
-   
-    st.write(
-        "The **Sharpe Ratio** measures how much excess return you earn per unit of risk. "
-        "A **higher Sharpe Ratio** means a better risk-adjusted return:"
-    )
-    st.markdown(
-        "- 🔴 **< 1.0:** Weak risk-adjusted returns\n"
-        "- 🟡 **1.0 - 2.0:** Moderate returns\n"
-        "- 🟢 **> 2.0:** Strong risk-adjusted returns"
-    )
-
-
-
-
-    st.markdown(
-        "Your portfolio's **Sharpe Ratio** is **{:.2f}**, which indicates its expected performance.".format(optimized_sharpe_ratio)
-    )
 
 
 

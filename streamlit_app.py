@@ -106,7 +106,24 @@ if optimize_button:
     if not ticker_list:
         st.warning("⚠️ Please enter at least one valid stock ticker.")
     else:
-        data = fetch_data(ticker_list, '2020-01-01', '2024-01-01')
+            start_date = '2020-01-01'
+    end_date = '2024-01-01'
+    valid_tickers = []
+    invalid_tickers = []
+
+    for ticker in ticker_list:
+        df = fetch_data(ticker, start_date, end_date)
+        if df.empty or df.isnull().all().all():
+            invalid_tickers.append(ticker)
+        else:
+            valid_tickers.append(ticker)
+
+    if invalid_tickers:
+        st.error(f"⚠️ No valid data found. The following ticker(s) are invalid or returned no data: {', '.join(invalid_tickers)}")
+    else:
+        data = fetch_data(valid_tickers, start_date, end_date)
+        returns = data.pct_change().dropna()
+
         if data.empty or data.isnull().all().all():
             st.warning("⚠️ No valid data found for the given tickers. Please check your ticker symbols.")
         else:

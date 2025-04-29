@@ -3,6 +3,7 @@ import sys
 import os
 import json
 
+
 # --- Package Installation Check ---
 # Try importing required packages. If not installed, install them using pip.
 try:
@@ -23,13 +24,17 @@ except ImportError:
     from scipy.optimize import minimize
     import streamlit as st
 
+
 # Use non-interactive backend for matplotlib to avoid GUI issues in Streamlit
 plt.switch_backend('Agg')
+
 
 # --- Constants ---
 USERS_FILE = "users.json"  # File for storing user account information and review logs
 
+
 # --- Utility Functions ---
+
 
 # Load users from the JSON file if it exists
 def load_users():
@@ -38,15 +43,19 @@ def load_users():
     with open(USERS_FILE, "r") as f:
         return json.load(f)  # Load and return JSON data
 
+
 # Save users back to the JSON file
 def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
+
 # --- Authentication Logic ---
+
 
 # Load existing users into memory
 users = load_users()
+
 
 # Initialize session state variables if they don't exist
 if "logged_in" not in st.session_state:
@@ -54,18 +63,22 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
+
 # Display log in/create account UI if user isn't logged in
 if not st.session_state.logged_in:
     st.markdown("<h1 style='text-align: center;'>📈 Smart Portfolio Optimization</h1>", unsafe_allow_html=True)
     st.write("---")
     st.markdown("<b>🔐 Log In or Create Account</b>", unsafe_allow_html=True)
 
+
     # Let user choose between log iin or account creation
     auth_choice = st.radio("Choose action:", ["Log In", "Create Account"])
+
 
     # Input fields for username and password
     username = st.text_input("Username (max 30 characters)")
     password = st.text_input("Password (max 15 characters)", type="password")
+
 
     # Style submit button to be full-width
     st.markdown("""
@@ -75,6 +88,7 @@ if not st.session_state.logged_in:
             }
         </style>
     """, unsafe_allow_html=True)
+
 
     # Submit button for authentication
     if st.button("Submit"):
@@ -106,7 +120,9 @@ if not st.session_state.logged_in:
     # Stop script here until log in is completed
     st.stop()
 
+
 # --- Main App (After Log In) ---
+
 
 # Title and description for the main app interface
 st.markdown("<h1 style='text-align: center;'>📈 Smart Portfolio Optimization</h1>", unsafe_allow_html=True)
@@ -115,19 +131,24 @@ st.markdown("")
 st.markdown("")
 st.markdown("")
 
+
 # Initialize review log in session if not already present
 if "review_log" not in st.session_state:
     st.session_state.review_log = []
 
+
 # --- User Input Section ---
+
 
 # Input for stock tickers
 st.markdown("<b>Enter your stock tickers:</b>", unsafe_allow_html=True)
 tickers = st.text_area("", value="AAPL, MSFT, GOOGL, AMZN, TSLA").strip()  # default example tickers
 
+
 # Input for investment amount
 st.markdown("<b>Enter your investment amount:</b>", unsafe_allow_html=True)
 principal = st.number_input("", min_value=0.0, value=100.0, step=100.0)
+
 
 # Style submit button to be full-width
 st.markdown("""
@@ -138,20 +159,25 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
 # Button to trigger portfolio optimization
 optimize_button = st.button("Optimize Portfolio")
 
+
 # --- Portfolio Functions ---
+
 
 # Fetch historical closing prices for given tickers and date range
 def fetch_data(tickers, start_date, end_date):
     return yf.download(tickers, start=start_date, end=end_date)['Close']
+
 
 # Calculate portfolio return and volatility given asset weights and return data
 def portfolio_performance(weights, returns):
     portfolio_return = np.sum(returns.mean() * weights) * 252  # Annualized return
     portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(returns.cov() * 252, weights)))  # Annualized volatility
     return portfolio_return, portfolio_volatility
+
 
 # Optimize portfolio to maximize Sharpe Ratio using numerical optimization
 def optimize_portfolio(returns, risk_free_rate):
@@ -163,10 +189,12 @@ def optimize_portfolio(returns, risk_free_rate):
                       method='SLSQP', bounds=bounds, constraints=constraints)
     return result
 
+
 # Calculate negative Sharpe ratio for use in optimization
 def negative_sharpe_ratio(weights, returns, risk_free_rate):
     p_ret, p_vol = portfolio_performance(weights, returns)
     return -(p_ret - risk_free_rate) / p_vol  # Sharpe Ratio = (Return - Risk-Free Rate) / Volatility
+
 
 # Generate data for plotting efficient frontier
 def plot_efficient_frontier(returns, risk_free_rate):
@@ -183,21 +211,23 @@ def plot_efficient_frontier(returns, risk_free_rate):
         results[2, i] = (portfolio_return - risk_free_rate) / portfolio_volatility  # Sharpe Ratio
     return results, weights_record  # Return data for plotting frontier
 
+
 # --- Main Portfolio Logic ---
 if optimize_button:  # Trigger the portfolio optimization process when the user clicks the button
     # Parse the user-input tickers, removing extra spaces and filtering out empty entries
     ticker_list = [ticker.strip() for ticker in tickers.split(',') if ticker.strip()]
-    
+   
     if not ticker_list:
         st.warning("⚠️ Please enter at least one valid stock ticker.")  # Warn if no tickers are provided
     else:
         # Define analysis time window
         start_date = '2020-01-01'
         end_date = '2024-01-01'
-        
+       
         # Lists to track valid and invalid tickers
         valid_tickers = []
         invalid_tickers = []
+
 
         # Validate tickers by attempting to fetch data
         for ticker in ticker_list:
@@ -207,6 +237,7 @@ if optimize_button:  # Trigger the portfolio optimization process when the user 
             else:
                 valid_tickers.append(ticker)  # Add to valid if data exists
 
+
         if invalid_tickers:
             # Show error if any invalid tickers are detected
             st.error(f"⚠️ No valid data found. Invalid tickers: {', '.join(invalid_tickers)}")
@@ -215,28 +246,33 @@ if optimize_button:  # Trigger the portfolio optimization process when the user 
             data = fetch_data(valid_tickers, start_date, end_date)
             returns = data.pct_change().dropna()
 
+
             # Fetch 10-year Treasury yield for risk-free rate
             treasury_yield = yf.Ticker("^TNX")
             treasury_data = treasury_yield.history(start="2020-01-01", end="2024-01-01")
-            
+           
             if treasury_data.empty:
                 st.warning("⚠️ Unable to retrieve risk-free rate data.")  # Warn if risk-free data unavailable
             else:
                 # Use latest yield as risk-free rate (convert % to decimal)
                 risk_free_rate = treasury_data['Close'].iloc[-1] / 100
 
+
                 # Optimize portfolio weights using MPT
                 optimized_result = optimize_portfolio(returns, risk_free_rate)
                 optimized_weights = optimized_result.x  # Optimal weights for each asset
+
 
                 # Calculate performance metrics
                 optimized_return, optimized_volatility = portfolio_performance(optimized_weights, returns)
                 optimized_sharpe_ratio = (optimized_return - risk_free_rate) / optimized_volatility
 
+
                 # Sort tickers and weights in descending order for display
                 sorted_indices = np.argsort(optimized_weights)[::-1]
                 sorted_tickers = [ticker_list[i] for i in sorted_indices]
                 sorted_weights = optimized_weights[sorted_indices]
+
 
                 # Display allocation pie chart
                 st.header("📊 Optimized Portfolio Allocation")
@@ -244,15 +280,17 @@ if optimize_button:  # Trigger the portfolio optimization process when the user 
                 cmap = plt.get_cmap('Greens')
                 colors = cmap(np.linspace(0.3, 0.7, len(sorted_tickers)))
 
+
                 # Labels only for weights ≥ 0.1%
                 labels = [f"{ticker} {w*100:.1f}%" if w >= 0.001 else "" for ticker, w in zip(sorted_tickers, sorted_weights)]
                 ax.pie(sorted_weights, labels=labels, startangle=140, colors=colors)
-                
+               
                 # Create legend for the pie chart
                 legend_labels = [f"{ticker}: {w*100:.1f}%" for ticker, w in zip(sorted_tickers, sorted_weights)]
                 ax.legend(legend_labels, title="Stock Allocations", loc="center left", bbox_to_anchor=(1, 0.5))
                 ax.axis('equal')  # Equal aspect ratio for perfect circle
                 st.pyplot(fig)
+
 
                 # Show table of portfolio allocations
                 st.markdown("<b>Portfolio Breakdown</b>", unsafe_allow_html=True)
@@ -263,6 +301,7 @@ if optimize_button:  # Trigger the portfolio optimization process when the user 
                 })
                 st.dataframe(allocation)
 
+
                 # Save allocation to session state
                 new_entry = {
                     "Tickers": tickers,
@@ -271,16 +310,19 @@ if optimize_button:  # Trigger the portfolio optimization process when the user 
                 }
                 st.session_state.review_log.insert(0, new_entry)  # Add to top of log
 
+
                 # Persist data to user file
                 users = load_users()
                 users[st.session_state.username]["review_log"] = st.session_state.review_log
                 save_users(users)
+
 
                 # Show efficient frontier plot with risk-return
                 st.header("📈 Risk-Return Analysis")
                 results, weights_record = plot_efficient_frontier(returns, risk_free_rate)
                 max_sharpe_idx = np.argmax(results[2])
                 sdp, rp = results[0, max_sharpe_idx], results[1, max_sharpe_idx]
+
 
                 fig, ax = plt.subplots(figsize=(10, 6))
                 scatter = ax.scatter(results[0, :], results[1, :], c=results[2, :], cmap='Blues', marker='o')
@@ -290,6 +332,7 @@ if optimize_button:  # Trigger the portfolio optimization process when the user 
                 ax.legend()
                 plt.colorbar(scatter, label='Sharpe Ratio')
                 st.pyplot(fig)
+
 
                 # Provide explanation of MPT and Sharpe Ratio
                 st.header("📊 Understanding Your Portfolio")
@@ -311,6 +354,7 @@ if optimize_button:  # Trigger the portfolio optimization process when the user 
                     "Your portfolio's **Sharpe Ratio** is **{:.2f}**, which indicates its expected performance.".format(optimized_sharpe_ratio)
                 )
 
+
 # --- Sidebar Review Log Section ---
 st.sidebar.header("📜 Review Log")
 st.write("")  # Spacing
@@ -319,8 +363,10 @@ st.write("")
 st.write("")
 st.write("---")
 
+
 # Create placeholder for log out button to stay at bottom
 logout_placeholder = st.empty()
+
 
 # --- Logout Button ---
 with logout_placeholder:
@@ -328,6 +374,7 @@ with logout_placeholder:
         for key in list(st.session_state.keys()):
             del st.session_state[key]  # Clear session data
         st.rerun()  # Restart the app
+
 
 # --- Expandable Sidebar for Review History ---
 with st.sidebar.expander("View All Previous Allocations", expanded=False):
@@ -337,6 +384,7 @@ with st.sidebar.expander("View All Previous Allocations", expanded=False):
         st.write(f"**Principal:** ${entry['Principal']}")
         st.dataframe(pd.DataFrame(entry["Allocation"]))  # Show allocation breakdown
         st.markdown("---")
+
 
 # --- Footer ---
 st.write("---")
